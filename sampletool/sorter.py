@@ -13,7 +13,7 @@ BPM_PATTERN = re.compile(r'(?<!\d)(6[0-9]|[7-9][0-9]|[1-9][0-9]{2})(?!\d)')
 def extract_bpm(filename: str) -> int | None:
     """Extrait le BPM d'un nom de fichier. Retourne un int ou None si pas trouvé."""
     match = BPM_PATTERN.search(filename)
-    return int(match.group(0)) if match else None
+    return match.group(0) if match else None
 
 def sort_folder(source: Path) -> dict:
     """
