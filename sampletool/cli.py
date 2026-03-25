@@ -2,7 +2,6 @@ import click
 from pathlib import Path
 from sampletool import __version__
 from sampletool.converter import convert_folder
-from sampletool.sorter import sort_folder
 from sampletool.profiles import get_profile, load_profiles
 
 
@@ -65,16 +64,3 @@ def convert(folder, profile_name, sample_rate, bit_depth, list_profiles):
     click.echo(f"→ Copiés     : {stats['copied']}")
     click.echo(f"⊘ Ignorés    : {stats['skipped']}")
     click.echo(f"✗ Erreurs    : {stats['errors']}")
-
-
-@main.command("sort-bpm")
-@click.argument("folder", type=click.Path(exists=True, file_okay=False, path_type=Path))
-def sort_bpm(folder):
-    """Rename audio files in FOLDER by moving BPM to the start of filename."""
-    click.echo(f"Source : {folder}")
-    click.echo("")
-
-    stats = sort_folder(folder)
-
-    click.echo(f"✓ Renommés : {stats['renamed']}")
-    click.echo(f"→ Ignorés  : {stats['skipped']}")

@@ -5,8 +5,8 @@ from dataclasses import dataclass
 # Patterns de détection
 # ---------------------------------------------------------------------------
 
-# BPM : nombre entre 60 et 999 isolé par des non-chiffres
-BPM_PATTERN = re.compile(r'(?<!\d)(6[0-9]|[7-9][0-9]|[1-9][0-9]{2})(?!\d)')
+# BPM : nombre entre 60 et 249 isolé par des non-chiffres
+BPM_PATTERN = re.compile(r'(?<!\d)(6[0-9]|[7-9][0-9]|1[0-9]{2}|2[0-4][0-9])(?!\d)')
 
 # Séparateur : underscore, tiret, espace (utilisé pour isoler les tokens)
 SEP = r'(?<=[_\-\s])'
