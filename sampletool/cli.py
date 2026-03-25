@@ -39,11 +39,11 @@ def convert(folder):
 @main.command("sort-bpm")
 @click.argument("folder", type=click.Path(exists=True, file_okay=False, path_type=Path))
 def sort_bpm(folder):
-    """Sort audio files in FOLDER into subfolders by BPM."""
+    """Rename audio files in FOLDER by moving BPM to the start of filename."""
     click.echo(f"Source : {folder}")
     click.echo("")
 
     stats = sort_folder(folder)
 
-    click.echo(f"✓ Déplacés  : {stats['moved']}")
-    click.echo(f"→ Ignorés   : {stats['skipped']}")
+    click.echo(f"✓ Renommés : {stats['renamed']}")
+    click.echo(f"→ Ignorés  : {stats['skipped']}")

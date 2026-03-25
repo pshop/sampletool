@@ -15,39 +15,47 @@ def extract_bpm(filename: str) -> int | None:
     match = BPM_PATTERN.search(filename)
     return match.group(0) if match else None
 
+def rename_file_with_bpm(file: Path) -> bool:
+    """
+    Déplace le BPM au début du nom de fichier.
+    Ex: trompette_135_loop.wav → 135_trompette_loop.wav
+    Retourne True si renommé, False si pas de BPM ou déjà en place.
+    """
+    bpm = extract_bpm(file.stem)
+    if bpm is None:
+        return False
+
+    # Retire le BPM (et les séparateurs autour) du nom original
+    clean = BPM_PATTERN.sub('', file.stem)
+    # Nettoie les underscores/tirets en double ou en début/fin
+    clean = re.sub(r'[_\-]{2,}', '_', clean).strip('_-')
+
+    new_name = f"{bpm}_{clean}{file.suffix}"
+
+    # Déjà au bon format, rien à faire
+    if file.name == new_name:
+        return False
+
+    file.rename(file.parent / new_name)
+    return True
+
 def sort_folder(source: Path) -> dict:
     """
-    Trie les fichiers audio de source dans des sous-dossiers _XXX_BPM.
-    Les fichiers sans BPM détectable sont laissés en place.
-    Retourne un dict avec les compteurs : moved, skipped.
+    Renomme les fichiers audio en plaçant le BPM en début de nom.
+    Les fichiers sans BPM sont laissés intacts.
+    Retourne un dict avec les compteurs : renamed, skipped.
     """
-    stats = {"moved": 0, "skipped": 0}
+    stats = {"renamed": 0, "skipped": 0}
 
     audio_files = [
         f for f in source.rglob("*")
-        if f.is_file()
-        and f.suffix.lower() in AUDIO_EXTENSIONS
-        and not re.search(r'_\d+_BPM', str(f.parent))
+        if f.is_file() and f.suffix.lower() in AUDIO_EXTENSIONS
     ]
 
     for file in audio_files:
-        bpm = extract_bpm(file.stem)
-        if bpm is None:
+        if rename_file_with_bpm(file):
+            stats["renamed"] += 1
+        else:
             stats["skipped"] += 1
-            continue
-
-        bpm_folder = source / f"_{bpm}_BPM"
-        bpm_folder.mkdir(exist_ok=True)
-
-        destination = bpm_folder / file.name
-
-        # Gestion des conflits de noms
-        counter = 2
-        while destination.exists():
-            destination = bpm_folder / f"{file.stem}_{counter}{file.suffix}"
-            counter += 1
-
-        file.rename(destination)
-        stats["moved"] += 1
 
     return stats
