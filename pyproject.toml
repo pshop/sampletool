@@ -8,6 +8,7 @@ version = "0.1.0"
 description = "A CLI toolkit for audio sample management"
 requires-python = ">=3.10"
 dependencies = [
+    "tomli>=2.0; python_version<'3.11'",
     "click>=8.0",
 ]
 

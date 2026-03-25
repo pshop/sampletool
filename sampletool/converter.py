@@ -1,23 +1,30 @@
 import re
+import shutil
 import subprocess
 from pathlib import Path
 
-# Extensions audio supportées
+from sampletool.key_parser import parse_filename, build_filename
+from sampletool.profiles import Profile
+
 AUDIO_EXTENSIONS = {
     ".mp3", ".wav", ".flac", ".aac", ".ogg", ".m4a",
     ".wma", ".aiff", ".aif", ".opus", ".mp2", ".ac3",
     ".amr", ".ape", ".mka", ".ra", ".caf"
 }
 
+BIT_DEPTH_FORMAT = {
+    8:  "u8",
+    16: "s16",
+    24: "s32",
+}
+
 
 def clean_filename(name: str) -> str:
-    """Remplace les espaces par des underscores et\
-     retire tous les caractères non-alphanumériques\
-     hors d'un nom de fichier."""
-    name = name.replace(' ', '_')
-    name = name.replace('-', '_')
-    
+    """Remplace espaces et tirets par underscores,
+    retire les caractères non-alphanumériques hors underscore et #."""
+    name = name.replace(' ', '_').replace('-', '_')
     return re.sub(r'[^a-zA-Z0-9_#]', '', name)
+
 
 def find_audio_files(folder: Path) -> list[Path]:
     """Retourne tous les fichiers audio dans folder et ses sous-dossiers."""
@@ -26,20 +33,112 @@ def find_audio_files(folder: Path) -> list[Path]:
         if f.is_file() and f.suffix.lower() in AUDIO_EXTENSIONS
     ]
 
-def convert_file(input_path: Path, output_path: Path) -> bool:
-    """
-    Convertit un fichier audio en WAV 16 bits / 48 000 Hz via FFmpeg.
-    Retourne True si succès, False si erreur.
-    """
-    output_path.parent.mkdir(parents=True, exist_ok=True)
 
+def probe_audio(path: Path) -> dict | None:
+    """
+    Utilise ffprobe pour lire sample_rate et bit_depth d'un fichier.
+    Retourne None si ffprobe échoue.
+    """
+    result = subprocess.run(
+        [
+            "ffprobe", "-v", "error",
+            "-select_streams", "a:0",
+            "-show_entries", "stream=sample_rate,bits_per_raw_sample",
+            "-of", "default=noprint_wrappers=1",
+            str(path),
+        ],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        return None
+
+    info = {}
+    for line in result.stdout.splitlines():
+        key, _, value = line.partition("=")
+        if key == "sample_rate" and value.isdigit():
+            info["sample_rate"] = int(value)
+        elif key == "bits_per_raw_sample" and value.isdigit():
+            info["bit_depth"] = int(value)
+
+    return info if info else None
+
+
+def effective_params(src_rate: int, src_depth: int,
+                     target_rate: int, target_depth: int) -> tuple[int, int]:
+    """
+    Calcule les paramètres effectifs de conversion.
+    On ne monte jamais ni le sample rate ni le bit depth.
+    """
+    return min(src_rate, target_rate), min(src_depth, target_depth)
+
+
+def needs_conversion(src_rate: int, src_depth: int,
+                     target_rate: int, target_depth: int) -> bool:
+    """
+    Retourne True si le fichier doit être converti.
+    Un fichier est copié tel quel si son rate ET sa depth
+    sont déjà inférieurs ou égaux à la cible.
+    """
+    eff_rate, eff_depth = effective_params(src_rate, src_depth, target_rate, target_depth)
+    return eff_rate != src_rate or eff_depth != src_depth
+
+
+def build_output_path(input_path: Path, source: Path,
+                      output_root: Path, profile: Profile) -> tuple[Path, list[str]]:
+    """
+    Calcule le chemin de sortie d'un fichier en appliquant :
+    - le parsing BPM + tonalité
+    - le nettoyage du nom
+    - la troncature si max_filename_length > 0
+    Retourne (output_path, warnings).
+    """
+    warnings = []
+    relative  = input_path.relative_to(source)
+
+    # Détermine l'extension de sortie
+    src_ext = input_path.suffix.lower()
+    if src_ext in profile.compatible_formats:
+        out_ext = src_ext          # format compatible → on garde
+    else:
+        out_ext = profile.convert_to  # format incompatible → on convertit
+
+    # Parse BPM + tonalité + nettoyage
+    parsed   = parse_filename(input_path.stem)
+    if parsed.key_warning:
+        warnings.append(
+            f"Tonalité ambiguë détectée '{parsed.key}' dans '{input_path.name}'"
+        )
+
+    # Nettoie le reste du nom
+    parsed.clean_stem = clean_filename(parsed.clean_stem)
+
+    new_name = build_filename(parsed, out_ext)
+
+    # Troncature si nécessaire
+    if profile.max_filename_length > 0:
+        stem     = Path(new_name).stem
+        ext      = Path(new_name).suffix
+        max_stem = profile.max_filename_length - len(ext)
+        if len(stem) > max_stem:
+            warnings.append(
+                f"Nom tronqué : '{new_name}' → '{stem[:max_stem]}{ext}'"
+            )
+            new_name = stem[:max_stem] + ext
+
+    return output_root / relative.parent / new_name, warnings
+
+
+def convert_file(input_path: Path, output_path: Path,
+                 sample_rate: int, bit_depth: int) -> bool:
+    """Convertit un fichier audio via FFmpeg. Retourne True si succès."""
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     result = subprocess.run(
         [
             "ffmpeg", "-i", str(input_path),
-            "-ar", "48000",
-            "-sample_fmt", "s16",
-            "-y",
-            "-loglevel", "error",
+            "-ar", str(sample_rate),
+            "-sample_fmt", BIT_DEPTH_FORMAT[bit_depth],
+            "-y", "-loglevel", "error",
             str(output_path),
         ],
         capture_output=True,
@@ -47,31 +146,66 @@ def convert_file(input_path: Path, output_path: Path) -> bool:
     )
     return result.returncode == 0
 
-def convert_folder(source: Path) -> dict:
+
+def convert_folder(source: Path, profile: Profile,
+                   override_rate: int | None = None,
+                   override_depth: int | None = None) -> dict:
     """
-    Convertit tous les fichiers audio de source (récursivement).
-    Les fichiers convertis sont placés dans source_16BITS.
-    Retourne un dict avec les compteurs : converted, skipped, errors.
+    Convertit tous les fichiers audio de source selon le profil donné.
+    override_rate et override_depth permettent de surcharger le profil.
+    Retourne un dict : converted, copied, skipped, errors, warnings.
     """
-    output_root = source.parent / (source.name + "_16BITS")
-    stats = {"converted": 0, "skipped": 0, "errors": 0}
+    # target_depth = override_depth or profile.target_bit_depth
+    # target_rate  = override_rate  or profile.target_sample_rate
+    # update pour éviter les 0 → on ne monte jamais les paramètres, même si profil mal configuré
+    target_rate  = override_rate  if override_rate  is not None else profile.target_sample_rate
+    target_depth = override_depth if override_depth is not None else profile.target_bit_depth
+
+
+    suffix      = f"_{target_depth}BITS"
+    output_root = source.parent / (source.name + suffix)
+    stats: dict = {"converted": 0, "copied": 0, "skipped": 0,
+                   "errors": 0, "warnings": []}
 
     for input_path in find_audio_files(source):
-        # Chemin relatif par rapport au dossier source
-        relative = input_path.relative_to(source)
 
-        # Nom de fichier nettoyé + extension .wav
-        clean_name = clean_filename(input_path.stem) + ".wav"
-        output_path = output_root / relative.parent / clean_name
+        output_path, warns = build_output_path(
+            input_path, source, output_root, profile
+        )
+        stats["warnings"].extend(warns)
 
         if output_path.exists():
             stats["skipped"] += 1
             continue
 
-        success = convert_file(input_path, output_path)
-        if success:
-            stats["converted"] += 1
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Lecture des métadonnées source
+        info      = probe_audio(input_path)
+        src_rate  = info.get("sample_rate", 0) if info else 0
+        src_depth = info.get("bit_depth", 0)   if info else 0
+
+        src_ext = input_path.suffix.lower()
+        format_incompatible = src_ext not in profile.compatible_formats
+
+        # Conversion obligatoire si format incompatible ou paramètres à ajuster
+        if format_incompatible or (
+            src_rate  > 0 and src_depth > 0 and
+            needs_conversion(src_rate, src_depth, target_rate, target_depth)
+        ):
+            eff_rate, eff_depth = effective_params(
+                src_rate  or target_rate,
+                src_depth or target_depth,
+                target_rate, target_depth
+            )
+            success = convert_file(input_path, output_path, eff_rate, eff_depth)
+            if success:
+                stats["converted"] += 1
+            else:
+                stats["errors"] += 1
         else:
-            stats["errors"] += 1
+            # Copie simple — format compatible, pas d'upscaling nécessaire
+            shutil.copy2(input_path, output_path)
+            stats["copied"] += 1
 
     return stats

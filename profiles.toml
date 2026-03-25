@@ -1,0 +1,18 @@
+# Profils de conversion audio pour sampletool
+# Chaque profil définit les paramètres cibles et les formats compatibles.
+
+[profiles.sp404]
+description = "Roland SP-404 MK II"
+target_sample_rate = 48000
+target_bit_depth = 16
+compatible_formats = [".wav", ".aiff", ".mp3"]
+convert_to = ".wav"
+max_filename_length = 64
+
+[profiles.lo-fi]
+description = "Lo-fi / artefacts"
+target_sample_rate = 22050
+target_bit_depth = 8
+compatible_formats = [".wav"]
+convert_to = ".wav"
+max_filename_length = 0   # 0 = pas de limite
