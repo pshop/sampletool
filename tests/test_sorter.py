@@ -8,6 +8,12 @@ def test_extract_bpm_standard():
 def test_extract_bpm_at_end():
     assert extract_bpm("SHADOW_BASS_128") == "128"
 
+def test_reject_bpm_below_60():
+    assert extract_bpm("Bass_Loop_59_Dm") is None
+
+def test_reject_bpm_above_249():
+    assert extract_bpm("Bass_Loop_250_Dm") is None
+
 def test_extract_bpm_none_when_missing():
     assert extract_bpm("Bass_Loop_Dm") is None
 

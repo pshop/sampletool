@@ -7,8 +7,8 @@ AUDIO_EXTENSIONS = {
     ".amr", ".ape", ".mka", ".ra", ".caf"
 }
 
-# Regex : nombre entre 60 et 999 isolé des autres chiffres
-BPM_PATTERN = re.compile(r'(?<!\d)(6[0-9]|[7-9][0-9]|[1-9][0-9]{2})(?!\d)')
+# Regex : nombre entre 60 et 249 isolé des autres chiffres
+BPM_PATTERN = re.compile(r'(?<!\d)(6[0-9]|[7-9][0-9]|1[0-9]{2}|2[0-4][0-9])(?!\d)')
 
 def extract_bpm(filename: str) -> int | None:
     """Extrait le BPM d'un nom de fichier. Retourne un int ou None si pas trouvé."""
