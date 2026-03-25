@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "sampletool"
+version = "0.1.0"
+description = "A CLI toolkit for audio sample management"
+requires-python = ">=3.10"
+dependencies = [
+    "click>=8.0",
+]
+
+[project.scripts]
+# Définit la commande 'sampletool' disponible dans le terminal après installation
+sampletool = "sampletool.cli:main"
+
+[tool.setuptools.packages.find]
+# Détecte automatiquement les packages Python dans le projet
+where = ["."]
+
+[project.optional-dependencies]
+# Dépendances de développement uniquement (pas nécessaires pour l'utilisateur final)
+# Installées avec : pip install -e ".[dev]"
+dev = [
+    "pytest>=8.0",
+    "pytest-cov",   # couverture de code
+]
+
+[tool.pytest.ini_options]
+# Dossier où pytest cherche les tests
+testpaths = ["tests"]
+# Affichage verbeux par défaut
+addopts = "-v"
