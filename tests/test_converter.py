@@ -9,6 +9,7 @@ def test_clean_filename_removes_spaces_and_dashes():
 
 def test_clean_filename_removes_special_chars():
     assert clean_filename("Bass_Loop-140!") == "Bass_Loop_140"
+    assert clean_filename("C#_major") == "C#_major"  # # conservé
 
 def test_clean_filename_keeps_alphanumeric():
     assert clean_filename("Track01") == "Track01"
