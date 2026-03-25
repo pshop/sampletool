@@ -26,7 +26,7 @@ jobs:
     steps:
       # Étape 1 : Récupérer le code source du repo
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       # Étape 2 : Installer la version Python cible
       - name: Set up Python
