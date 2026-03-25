@@ -1,6 +1,8 @@
 import click
+from pathlib import Path
 from sampletool import __version__
-
+from sampletool.converter import convert_folder
+from sampletool.sorter import sort_folder
 
 # -----------------------------------------------------------------------------
 # Groupe principal de commandes
@@ -20,16 +22,28 @@ def main():
 # -----------------------------------------------------------------------------
 
 @main.command("convert")
-@click.argument("folder", type=click.Path(exists=True, file_okay=False))
+@click.argument("folder", type=click.Path(exists=True, file_okay=False, path_type=Path))
 def convert(folder):
     """Convert all audio files in FOLDER to WAV 16-bit 48kHz."""
-    # La logique sera implémentée à l'étape 2
-    click.echo(f"[convert] Dossier cible : {folder} (à implémenter)")
+    click.echo(f"Source  : {folder}")
+    click.echo(f"Sortie  : {folder.parent / (folder.name + '_16BITS')}")
+    click.echo("")
+
+    stats = convert_folder(folder)
+
+    click.echo(f"✓ Convertis : {stats['converted']}")
+    click.echo(f"→ Ignorés   : {stats['skipped']}")
+    click.echo(f"✗ Erreurs   : {stats['errors']}")
 
 
 @main.command("sort-bpm")
-@click.argument("folder", type=click.Path(exists=True, file_okay=False))
+@click.argument("folder", type=click.Path(exists=True, file_okay=False, path_type=Path))
 def sort_bpm(folder):
     """Sort audio files in FOLDER into subfolders by BPM."""
-    # La logique sera implémentée à l'étape 2
-    click.echo(f"[sort-bpm] Dossier cible : {folder} (à implémenter)")
+    click.echo(f"Source : {folder}")
+    click.echo("")
+
+    stats = sort_folder(folder)
+
+    click.echo(f"✓ Déplacés  : {stats['moved']}")
+    click.echo(f"→ Ignorés   : {stats['skipped']}")
