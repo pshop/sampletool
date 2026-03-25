@@ -17,6 +17,14 @@ def test_bpm_not_in_longer_number():
     bpm, _ = extract_bpm("Sample1401")
     assert bpm is None
 
+def test_reject_bpm_below_60():
+    bpm, _ = extract_bpm("Bass_Loop_59_Dm")
+    assert bpm is None
+
+def test_reject_bpm_above_249():
+    bpm, _ = extract_bpm("Bass_Loop_250_Dm")
+    assert bpm is None
+
 
 # --- Tonalité ---
 
