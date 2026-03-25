@@ -4,7 +4,7 @@ from pathlib import Path
 try:
     import tomllib          # stdlib Python 3.11+
 except ImportError:
-    import tomli as tomllib # fallback pour Python 3.10
+    import tomli as tomllib # type: ignore[import-not-found]
 
 
 # Chemin du fichier de profils — à la racine du projet
