@@ -21,8 +21,8 @@ def test_reject_bpm_below_60():
     bpm, _ = extract_bpm("Bass_Loop_59_Dm")
     assert bpm is None
 
-def test_reject_bpm_above_249():
-    bpm, _ = extract_bpm("Bass_Loop_250_Dm")
+def test_reject_bpm_above_239():
+    bpm, _ = extract_bpm("Bass_Loop_240_Dm")
     assert bpm is None
 
 
