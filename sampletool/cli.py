@@ -4,6 +4,44 @@ from sampletool import __version__
 from sampletool.converter import convert_folder, find_audio_files
 from sampletool.profiles import get_profile, load_profiles
 
+def pick_folder_gui() -> Path | None:
+    """
+    Ouvre une boîte de dialogue pour sélectionner un dossier.
+    Retourne le chemin choisi ou None si annulé.
+    tkinter est inclus dans Python, aucune installation requise.
+    """
+    try:
+        import tkinter as tk
+        from tkinter import filedialog
+
+        # On crée une fenêtre racine invisible — nécessaire pour filedialog
+        root = tk.Tk()
+        root.withdraw()
+        # Forcer la fenêtre au premier plan
+        root.lift()
+        root.attributes("-topmost", True)
+
+        folder = filedialog.askdirectory(title="Sélectionnez le dossier à convertir")
+        root.destroy()
+
+        return Path(folder) if folder else None
+
+    except ImportError:
+        raise click.ClickException(
+            "tkinter n'est pas disponible sur ce système. "
+            "Passez le dossier en argument : sampletool convert /chemin/dossier"
+        )
+
+def check_ffmpeg() -> None:
+    """Vérifie que ffmpeg et ffprobe sont disponibles dans le PATH."""
+    import shutil
+    missing = [tool for tool in ("ffmpeg", "ffprobe") if not shutil.which(tool)]
+    if missing:
+        raise click.ClickException(
+            f"{', '.join(missing)} introuvable(s) dans le PATH.\n"
+            "  Installez FFmpeg : https://ffmpeg.org/download.html\n"
+            "  Puis ajoutez le dossier bin/ à votre PATH."
+        )
 
 @click.group()
 @click.version_option(version=__version__)
@@ -27,6 +65,7 @@ def main():
               help="Override profile bit depth.")
 @click.option("--list-profiles", is_flag=True, default=False,
               help="List available profiles and exit.")
+
 def convert(folder, profile_name, sample_rate, bit_depth, list_profiles):
     """Convert all audio files in FOLDER to WAV.
 
@@ -37,6 +76,8 @@ def convert(folder, profile_name, sample_rate, bit_depth, list_profiles):
         for name, p in profiles.items():
             click.echo(f"  {name:<12} — {p.description}")
         return
+    
+    check_ffmpeg()
 
     # Si aucun dossier fourni → ouvre la boîte de dialogue
     if folder is None:

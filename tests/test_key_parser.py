@@ -116,3 +116,16 @@ def test_key_minor_in_middle():
     # 'Am' en milieu → détecté
     key, _, _ = extract_key("Bass_Am_Loop")
     assert key == "Am"
+
+def test_bpm_word_removed():
+    bpm, clean = extract_bpm("bCloop1_112bpm")
+    assert bpm == "112"
+    assert "bpm" not in clean.lower()
+
+def test_bpm_leading_zero_ignored():
+    bpm, _ = extract_bpm("060_One_Shot_D#")
+    assert bpm is None
+
+def test_bpm_no_leading_zero():
+    bpm, _ = extract_bpm("150_bass_tonal")
+    assert bpm == "150"

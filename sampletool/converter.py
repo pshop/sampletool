@@ -87,32 +87,22 @@ def needs_conversion(src_rate: int, src_depth: int,
 def build_output_path(input_path: Path, source: Path,
                       output_root: Path, profile: Profile) -> tuple[Path, list[str]]:
     """
-    Calcule le chemin de sortie d'un fichier en appliquant :
-    - le parsing BPM + tonalité
-    - le nettoyage du nom
-    - la troncature si max_filename_length > 0
-    Retourne (output_path, warnings).
+    Calcule le chemin de sortie en appliquant parsing BPM+tonalité,
+    nettoyage du nom, troncature et gestion des conflits.
     """
     warnings = []
-    relative  = input_path.relative_to(source)
+    relative = input_path.relative_to(source)
 
-    # Détermine l'extension de sortie
     src_ext = input_path.suffix.lower()
-    if src_ext in profile.compatible_formats:
-        out_ext = src_ext          # format compatible → on garde
-    else:
-        out_ext = profile.convert_to  # format incompatible → on convertit
+    out_ext = src_ext if src_ext in profile.compatible_formats else profile.convert_to
 
-    # Parse BPM + tonalité + nettoyage
-    parsed   = parse_filename(input_path.stem)
+    parsed = parse_filename(input_path.stem)
     if parsed.key_warning:
         warnings.append(
             f"Tonalité ambiguë détectée '{parsed.key}' dans '{input_path.name}'"
         )
 
-    # Nettoie le reste du nom
     parsed.clean_stem = clean_filename(parsed.clean_stem)
-
     new_name = build_filename(parsed, out_ext)
 
     # Troncature si nécessaire
@@ -121,13 +111,28 @@ def build_output_path(input_path: Path, source: Path,
         ext      = Path(new_name).suffix
         max_stem = profile.max_filename_length - len(ext)
         if len(stem) > max_stem:
-            warnings.append(
-                f"Nom tronqué : '{new_name}' → '{stem[:max_stem]}{ext}'"
-            )
+            warnings.append(f"Nom tronqué : '{new_name}' → '{stem[:max_stem]}{ext}'")
             new_name = stem[:max_stem] + ext
 
-    return output_root / relative.parent / new_name, warnings
+    output_path = output_root / relative.parent / new_name
 
+    # Gestion des conflits : si le nom existe déjà (produit par un autre fichier source)
+    # on ajoute un suffixe _2, _3, etc.
+    if output_path.exists():
+        stem = Path(new_name).stem
+        ext  = Path(new_name).suffix
+        counter = 2
+        while output_path.exists():
+            candidate = output_root / relative.parent / f"{stem}_{counter}{ext}"
+            if not candidate.exists():
+                warnings.append(
+                    f"Conflit de nom : '{new_name}' renommé en '{stem}_{counter}{ext}'"
+                )
+                output_path = candidate
+                break
+            counter += 1
+
+    return output_path, warnings
 
 def convert_file(input_path: Path, output_path: Path,
                  sample_rate: int, bit_depth: int) -> bool:
@@ -149,7 +154,8 @@ def convert_file(input_path: Path, output_path: Path,
 
 def convert_folder(source: Path, profile: Profile,
                    override_rate: int | None = None,
-                   override_depth: int | None = None) -> dict:
+                   override_depth: int | None = None,
+                   progress_callback=None) -> dict:
     """
     Convertit tous les fichiers audio de source selon le profil donné.
     override_rate et override_depth permettent de surcharger le profil.
@@ -207,5 +213,7 @@ def convert_folder(source: Path, profile: Profile,
             # Copie simple — format compatible, pas d'upscaling nécessaire
             shutil.copy2(input_path, output_path)
             stats["copied"] += 1
-
+            
+        if progress_callback:
+            progress_callback()
     return stats

@@ -5,8 +5,11 @@ from dataclasses import dataclass
 # Patterns de détection
 # ---------------------------------------------------------------------------
 
-# BPM : nombre entre 60 et 249 isolé par des non-chiffres
-BPM_PATTERN = re.compile(r'(?<!\d)(6[0-9]|[7-9][0-9]|1[0-9]{2}|2[0-3][0-9])(?!\d)')
+# BPM : nombre entre 60 et 239, sans zéro en tête, isolé par des non-chiffres
+# (?!0) exclut les nombres commençant par zéro (index de fichiers)
+BPM_PATTERN = re.compile(
+    r'(?<!\d)(?!0)(6[0-9]|[7-9][0-9]|1[0-9]{2}|2[0-3][0-9])(?!\d)'
+)
 
 # Séparateur : underscore, tiret, espace (utilisé pour isoler les tokens)
 SEP = r'(?<=[_\-\s])'
@@ -17,6 +20,9 @@ _NOTES       = r'[A-G]'
 _SHARP_FLAT  = r'(?:#|b)?'
 _MINOR       = r'(?:m|min|minor)'
 _MAJOR       = r'(?:maj|major)'
+
+# Mot "bpm" optionnellement collé au nombre ou séparé par un séparateur
+BPM_WORD = re.compile(r'[_\-\s]?bpm', re.IGNORECASE)
 
 # Mineur avec ou sans bémol/dièse : Am, C#m, Bbmin, F#minor
 KEY_MINOR = re.compile(
@@ -73,8 +79,11 @@ def extract_bpm(stem: str) -> tuple[str | None, str]:
     match = BPM_PATTERN.search(stem)
     if not match:
         return None, stem
+    
     bpm = match.group()
     clean = BPM_PATTERN.sub('', stem)
+    # Retire le mot "bpm" résiduel (ex: "112bpm" → après extraction du nombre reste "bpm")
+    clean = BPM_WORD.sub('', clean)
     clean = _clean_separators(clean)
     return bpm, clean
 
