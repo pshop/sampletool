@@ -43,6 +43,41 @@ def check_ffmpeg() -> None:
             "  Puis ajoutez le dossier bin/ à votre PATH."
         )
 
+def write_report(report: list[dict], output_path: Path, dry_run: bool) -> None:
+    """
+    Écrit un rapport de conversion dans un fichier texte.
+    Chaque ligne indique : AVANT → APRÈS [action] + warnings éventuels.
+    """
+    col_width = max((len(e["before"]) for e in report), default=40) + 2
+
+    lines = [
+        f"sampletool — Rapport de conversion{'  [DRY RUN]' if dry_run else ''}",
+        f"Généré le : {__import__('datetime').datetime.now().strftime('%Y-%m-%d %H:%M')}",
+        "=" * 80,
+        f"{'AVANT':<{col_width}} {'APRÈS':<{col_width}} ACTION",
+        "-" * 80,
+    ]
+
+    for entry in report:
+        warn_str = "  ⚠ " + " | ".join(entry["warns"]) if entry["warns"] else ""
+        lines.append(
+            f"{entry['before']:<{col_width}} "
+            f"{entry['after']:<{col_width}} "
+            f"[{entry['action']}]{warn_str}"
+        )
+
+    lines += [
+        "-" * 80,
+        f"Total : {len(report)} fichier(s)",
+        f"  convertis : {sum(1 for e in report if e['action'] == 'converti')}",
+        f"  copiés    : {sum(1 for e in report if e['action'] == 'copié')}",
+        f"  ignorés   : {sum(1 for e in report if e['action'] == 'ignoré')}",
+        f"  erreurs   : {sum(1 for e in report if e['action'] == 'erreur')}",
+    ]
+
+    output_path.write_text("\n".join(lines), encoding="utf-8")
+    click.echo(f"Rapport écrit : {output_path}")
+
 @click.group()
 @click.version_option(version=__version__)
 def main():
@@ -57,16 +92,18 @@ def main():
               help="Conversion profile to use.")
 @click.option("--sample-rate", "-r",
               type=click.Choice(["22050", "32000", "44100", "48000"]),
-              default=None,
-              help="Override profile sample rate.")
+              default=None, help="Override profile sample rate.")
 @click.option("--bit-depth", "-b",
               type=click.Choice(["8", "16", "24"]),
-              default=None,
-              help="Override profile bit depth.")
+              default=None, help="Override profile bit depth.")
 @click.option("--list-profiles", is_flag=True, default=False,
               help="List available profiles and exit.")
-
-def convert(folder, profile_name, sample_rate, bit_depth, list_profiles):
+@click.option("--dry-run", is_flag=True, default=False,
+              help="Simulate conversion without writing any file.")
+@click.option("--report", is_flag=True, default=False,
+              help="Write a conversion report alongside the output folder.")
+def convert(folder, profile_name, sample_rate, bit_depth,
+            list_profiles, dry_run, report):
     """Convert all audio files in FOLDER to WAV.
 
     If FOLDER is omitted, a file picker dialog will open.
@@ -76,10 +113,9 @@ def convert(folder, profile_name, sample_rate, bit_depth, list_profiles):
         for name, p in profiles.items():
             click.echo(f"  {name:<12} — {p.description}")
         return
-    
+
     check_ffmpeg()
 
-    # Si aucun dossier fourni → ouvre la boîte de dialogue
     if folder is None:
         click.echo("Aucun dossier spécifié, ouverture du sélecteur...")
         folder = pick_folder_gui()
@@ -97,13 +133,15 @@ def convert(folder, profile_name, sample_rate, bit_depth, list_profiles):
     override_rate  = int(sample_rate) if sample_rate else None
     override_depth = int(bit_depth)   if bit_depth   else None
 
+    if dry_run:
+        click.echo("*** DRY RUN — aucun fichier ne sera modifié ***\n")
+
     click.echo(f"Profil       : {profile.name} — {profile.description}")
-    click.echo(f"Sample rate  : {override_rate or profile.target_sample_rate} Hz")
+    click.echo(f"Sample rate  : {override_rate  or profile.target_sample_rate} Hz")
     click.echo(f"Bit depth    : {override_depth or profile.target_bit_depth} bits")
     click.echo(f"Source       : {folder}")
     click.echo("")
 
-    # Compte les fichiers à traiter pour la barre de progression
     audio_files = find_audio_files(folder)
     total = len(audio_files)
 
@@ -113,22 +151,19 @@ def convert(folder, profile_name, sample_rate, bit_depth, list_profiles):
 
     click.echo(f"{total} fichier(s) trouvé(s)\n")
 
-    # Barre de progression
     with click.progressbar(
         length=total,
-        label="Conversion",
+        label="Analyse" if dry_run else "Conversion",
         bar_template="%(label)s  %(bar)s  %(info)s",
         show_percent=True,
         show_pos=True,
     ) as bar:
-        def on_progress(n: int = 1):
-            bar.update(n)
-
         stats = convert_folder(
             folder, profile,
             override_rate=override_rate,
             override_depth=override_depth,
-            progress_callback=on_progress,
+            progress_callback=lambda: bar.update(1),
+            dry_run=dry_run,
         )
 
     click.echo("")
@@ -143,3 +178,10 @@ def convert(folder, profile_name, sample_rate, bit_depth, list_profiles):
     click.echo(f"→ Copiés     : {stats['copied']}")
     click.echo(f"⊘ Ignorés    : {stats['skipped']}")
     click.echo(f"✗ Erreurs    : {stats['errors']}")
+
+    # Génère le rapport si --report ou --dry-run
+    if report or dry_run:
+        suffix      = f"_{override_depth or profile.target_bit_depth}BITS"
+        output_root = folder.parent / (folder.name + suffix)
+        report_path = folder.parent / (folder.name + "_report.txt")
+        write_report(stats["report"], report_path, dry_run=dry_run)

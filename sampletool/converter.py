@@ -155,23 +155,24 @@ def convert_file(input_path: Path, output_path: Path,
 def convert_folder(source: Path, profile: Profile,
                    override_rate: int | None = None,
                    override_depth: int | None = None,
-                   progress_callback=None) -> dict:
+                   progress_callback=None,
+                   dry_run: bool = False) -> dict:
     """
     Convertit tous les fichiers audio de source selon le profil donné.
-    override_rate et override_depth permettent de surcharger le profil.
-    Retourne un dict : converted, copied, skipped, errors, warnings.
+    dry_run=True : calcule les opérations sans les exécuter.
+    Retourne un dict : converted, copied, skipped, errors, warnings, report.
     """
-    # target_depth = override_depth or profile.target_bit_depth
-    # target_rate  = override_rate  or profile.target_sample_rate
-    # update pour éviter les 0 → on ne monte jamais les paramètres, même si profil mal configuré
-    target_rate  = override_rate  if override_rate  is not None else profile.target_sample_rate
-    target_depth = override_depth if override_depth is not None else profile.target_bit_depth
+    target_rate  = override_rate  or profile.target_sample_rate
+    target_depth = override_depth or profile.target_bit_depth
 
-
-    suffix      = f"_{target_depth}BITS"
+    suffix      = f"_{profile.name}"
     output_root = source.parent / (source.name + suffix)
-    stats: dict = {"converted": 0, "copied": 0, "skipped": 0,
-                   "errors": 0, "warnings": []}
+    stats: dict = {
+        "converted": 0, "copied": 0, "skipped": 0,
+        "errors": 0, "warnings": [],
+        # Liste de dicts décrivant chaque opération — utilisée pour le rapport
+        "report": []
+    }
 
     for input_path in find_audio_files(source):
 
@@ -180,25 +181,55 @@ def convert_folder(source: Path, profile: Profile,
         )
         stats["warnings"].extend(warns)
 
+        # Détermine l'action qui sera effectuée
         if output_path.exists():
+            action = "ignoré"
             stats["skipped"] += 1
+            stats["report"].append({
+                "before": input_path.name,
+                "after":  output_path.name,
+                "action": action,
+                "warns":  warns,
+            })
+            if progress_callback:
+                progress_callback()
             continue
 
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-
-        # Lecture des métadonnées source
         info      = probe_audio(input_path)
         src_rate  = info.get("sample_rate", 0) if info else 0
         src_depth = info.get("bit_depth", 0)   if info else 0
+        src_ext   = input_path.suffix.lower()
 
-        src_ext = input_path.suffix.lower()
         format_incompatible = src_ext not in profile.compatible_formats
 
-        # Conversion obligatoire si format incompatible ou paramètres à ajuster
         if format_incompatible or (
             src_rate  > 0 and src_depth > 0 and
             needs_conversion(src_rate, src_depth, target_rate, target_depth)
         ):
+            action = "converti"
+        else:
+            action = "copié"
+
+        stats["report"].append({
+            "before": input_path.name,
+            "after":  output_path.name,
+            "action": action,
+            "warns":  warns,
+        })
+
+        if dry_run:
+            # En dry-run on comptabilise sans toucher aux fichiers
+            if action == "converti":
+                stats["converted"] += 1
+            else:
+                stats["copied"] += 1
+            if progress_callback:
+                progress_callback()
+            continue
+
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        if action == "converti":
             eff_rate, eff_depth = effective_params(
                 src_rate  or target_rate,
                 src_depth or target_depth,
@@ -209,11 +240,13 @@ def convert_folder(source: Path, profile: Profile,
                 stats["converted"] += 1
             else:
                 stats["errors"] += 1
+                # Corrige l'action dans le rapport
+                stats["report"][-1]["action"] = "erreur"
         else:
-            # Copie simple — format compatible, pas d'upscaling nécessaire
             shutil.copy2(input_path, output_path)
             stats["copied"] += 1
-            
+
         if progress_callback:
             progress_callback()
+
     return stats
