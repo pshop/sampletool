@@ -1,6 +1,6 @@
 from sampletool.converter import (
     clean_filename, find_audio_files, effective_params,
-    needs_conversion, build_output_path
+    needs_conversion, build_output_path, convert_folder
 )
 from sampletool.profiles import Profile
 from pathlib import Path
@@ -111,3 +111,11 @@ def test_build_output_path_incompatible_format(tmp_path):
     f.touch()
     out, _ = build_output_path(f, source, tmp_path / "out", TEST_PROFILE)
     assert out.suffix == ".wav"
+
+def test_convert_folder_output_suffix(tmp_path):
+    source = tmp_path / "samples"
+    source.mkdir()
+    profile = TEST_PROFILE
+    stats = convert_folder(source, profile)
+    expected_output = tmp_path / "samples_test"  # suffixe = nom du profil
+    assert stats["converted"] == 0

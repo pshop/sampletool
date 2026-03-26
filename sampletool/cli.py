@@ -133,6 +133,16 @@ def convert(folder, profile_name, sample_rate, bit_depth,
     override_rate  = int(sample_rate) if sample_rate else None
     override_depth = int(bit_depth)   if bit_depth   else None
 
+    # Vérifie si le dossier de sortie existe déjà
+    suffix      = f"_{profile.name}"
+    output_root = folder.parent / (folder.name + suffix)
+
+    if output_root.exists() and not dry_run:
+        click.echo(f"⚠  Le dossier de sortie existe déjà : {output_root}")
+        if not click.confirm("Voulez-vous continuer et écraser les fichiers existants ?"):
+            raise click.ClickException("Opération annulée.")
+        click.echo("")
+
     if dry_run:
         click.echo("*** DRY RUN — aucun fichier ne sera modifié ***\n")
 
