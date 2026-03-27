@@ -31,6 +31,16 @@ def test_clean_filename_removes_special_chars():
 def test_clean_filename_keeps_alphanumeric():
     assert clean_filename("Track01") == "Track01"
 
+def test_clean_filename_no_leading_underscore():
+    # "! spinz 808" → pas d'underscore en début
+    assert clean_filename("! spinz 808") == "spinz_808"
+
+def test_clean_filename_dot_in_name():
+    # "evaphin.wav_AVDT" → le point est retiré sans laisser de trace
+    assert clean_filename("evaphin.wav_AVDT") == "evaphinwav_AVDT"
+
+def test_clean_filename_multiple_underscores():
+    assert clean_filename("Bass - Copy") == "Bass_Copy"
 
 # --- find_audio_files ---
 

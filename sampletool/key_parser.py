@@ -18,8 +18,8 @@ END = r'(?=$|[_\-\s])'
 # Tonalités — construites explicitement pour éviter les faux positifs
 _NOTES       = r'[A-G]'
 _SHARP_FLAT  = r'(?:#|b)?'
-_MINOR       = r'(?:m|min|minor)'
-_MAJOR       = r'(?:maj|major)'
+_MINOR = r'[_\-]?(?:m|min|minor)'
+_MAJOR = r'[_\-]?(?:maj|major)'
 
 # Mot "bpm" optionnellement collé au nombre ou séparé par un séparateur
 BPM_WORD = re.compile(r'[_\-\s]?bpm', re.IGNORECASE)

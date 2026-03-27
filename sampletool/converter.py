@@ -23,7 +23,9 @@ def clean_filename(name: str) -> str:
     """Remplace espaces et tirets par underscores,
     retire les caractères non-alphanumériques hors underscore et #."""
     name = name.replace(' ', '_').replace('-', '_')
-    return re.sub(r'[^a-zA-Z0-9_#]', '', name)
+    name = re.sub(r'[^a-zA-Z0-9_#]', '', name)
+    name = re.sub(r'_{2,}', '_', name)
+    return name.strip('_')
 
 
 def find_audio_files(folder: Path) -> list[Path]:
@@ -103,6 +105,7 @@ def build_output_path(input_path: Path, source: Path,
         )
 
     parsed.clean_stem = clean_filename(parsed.clean_stem)
+    parsed.clean_stem = parsed.clean_stem.strip('_')
     new_name = build_filename(parsed, out_ext)
 
     # Troncature si nécessaire

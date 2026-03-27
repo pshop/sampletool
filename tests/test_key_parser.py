@@ -63,6 +63,16 @@ def test_key_none():
     assert key is None
     assert warning is False
 
+def test_key_minor_with_separator():
+    key, warning, _ = extract_key("string_melody_G_minor")
+    assert key == "G_minor"  # ou "Gminor" selon normalisation souhaitée
+    assert warning is False
+
+def test_key_major_with_separator():
+    key, warning, _ = extract_key("Rhodes_C_maj_Chord")
+    assert key == "C_maj"
+    assert warning is False
+
 
 # --- Parse complet ---
 
