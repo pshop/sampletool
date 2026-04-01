@@ -37,7 +37,7 @@ def test_clean_filename_no_leading_underscore():
 
 def test_clean_filename_dot_in_name():
     # "evaphin.wav_AVDT" → le point est retiré sans laisser de trace
-    assert clean_filename("evaphin.wav_AVDT") == "evaphinwav_AVDT"
+    assert clean_filename("evaphin.wav_AVDT") == "evaphin_wav_AVDT"
 
 def test_clean_filename_multiple_underscores():
     assert clean_filename("Bass - Copy") == "Bass_Copy"

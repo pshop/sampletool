@@ -191,7 +191,5 @@ def convert(folder, profile_name, sample_rate, bit_depth,
 
     # Génère le rapport si --report ou --dry-run
     if report or dry_run:
-        suffix      = f"_{override_depth or profile.target_bit_depth}BITS"
-        output_root = folder.parent / (folder.name + suffix)
         report_path = folder.parent / (folder.name + "_report.txt")
         write_report(stats["report"], report_path, dry_run=dry_run)

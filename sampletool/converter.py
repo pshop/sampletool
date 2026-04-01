@@ -22,9 +22,10 @@ BIT_DEPTH_FORMAT = {
 def clean_filename(name: str) -> str:
     """Remplace espaces et tirets par underscores,
     retire les caractères non-alphanumériques hors underscore et #."""
-    name = name.replace(' ', '_').replace('-', '_')
+    name = name.replace(' ', '_').replace('-', '_').replace('.', '_')
     name = re.sub(r'[^a-zA-Z0-9_#]', '', name)
     name = re.sub(r'_{2,}', '_', name)
+
     return name.strip('_')
 
 
@@ -199,6 +200,8 @@ def convert_folder(source: Path, profile: Profile,
             continue
 
         info      = probe_audio(input_path)
+        if info is None:
+            stats["warnings"].append(f"Impossible de lire les infos audio de '{input_path.name}'")
         src_rate  = info.get("sample_rate", 0) if info else 0
         src_depth = info.get("bit_depth", 0)   if info else 0
         src_ext   = input_path.suffix.lower()

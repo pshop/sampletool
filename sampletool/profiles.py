@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from pathlib import Path
+from functools import lru_cache
 
 try:
     import tomllib          # stdlib Python 3.11+
@@ -21,7 +22,7 @@ class Profile:
     convert_to: str
     max_filename_length: int = 0   # 0 = pas de limite
 
-
+@lru_cache(maxsize=None)
 def load_profiles() -> dict[str, Profile]:
     """
     Charge tous les profils depuis profiles.toml.
